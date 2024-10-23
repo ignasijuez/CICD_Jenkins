@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Disabled;
  * @author Dave Syer
  *
  */
-//@Disabled
+@Disabled
 @Configuration
 public class MysqlTestApplication {
 

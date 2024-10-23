@@ -45,7 +45,7 @@ import org.springframework.test.context.ActiveProfiles;
 		includeFilters = @ComponentScan.Filter(value = PetTypeFormatter.class, type = FilterType.ASSIGNABLE_TYPE))
 @DisabledInNativeImage
 @DisabledInAotMode
-//@ActiveProfiles("h2")
+@ActiveProfiles("h2")
 class PetControllerTests {
 
 	private static final int TEST_OWNER_ID = 1;

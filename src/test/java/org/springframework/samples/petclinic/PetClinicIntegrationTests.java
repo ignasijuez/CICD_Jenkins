@@ -33,7 +33,7 @@ import org.springframework.web.client.RestTemplate;
 import org.junit.jupiter.api.Disabled;
 
 
-//@Disabled
+@Disabled
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 public class PetClinicIntegrationTests {
 

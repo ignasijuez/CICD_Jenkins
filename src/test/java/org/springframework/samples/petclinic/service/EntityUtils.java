@@ -31,7 +31,7 @@ import java.util.Collection;
  * @see org.springframework.samples.petclinic.model.BaseEntity
  * @since 29.10.2003
  */
-//@ActiveProfiles("h2")
+@ActiveProfiles("h2")
 public abstract class EntityUtils {
 
 	/**
