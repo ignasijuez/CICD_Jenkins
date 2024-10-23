@@ -47,7 +47,7 @@ import org.junit.jupiter.api.Disabled;
  * @author Alex Lutz
  */
 // NOT Waiting https://github.com/spring-projects/spring-boot/issues/5574
-@Disabled
+//@Disabled
 @SpringBootTest(webEnvironment = RANDOM_PORT,
 		properties = { "server.error.include-message=ALWAYS", "management.endpoints.enabled-by-default=false" })
 class CrashControllerIntegrationTests {
