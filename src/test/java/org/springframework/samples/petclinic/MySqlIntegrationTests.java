@@ -36,6 +36,7 @@ import org.springframework.web.client.RestTemplate;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.junit.jupiter.api.Disabled;
 
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("mysql")
