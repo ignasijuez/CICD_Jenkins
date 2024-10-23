@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jenkins-mysql-deployment
+  labels:
+    app: mysql-jenkins
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql-jenkins
+  template:
+    metadata:
+      labels:
+        app: mysql-jenkins
+      annotations:
+        pod-name: jenkins-mysql-deployment
+    spec:
+      containers:
+      - name: mysql-jenkins
+        image: mysql:8.4  # The MySQL version
+        ports:
+        - containerPort: 3306
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: ""  # empty password as per docker-compose
+        - name: MYSQL_ALLOW_EMPTY_PASSWORD
+          value: "true"
+        - name: MYSQL_USER
+          value: "petclinic"
+        - name: MYSQL_PASSWORD
+          value: "petclinic"
+        - name: MYSQL_DATABASE
+          value: "petclinic"
+        volumeMounts:
+        - name: mysql-persistent-storage
+          mountPath: /var/lib/mysql
+        - name: mysql-initdb
+          mountPath: /docker-entrypoint-initdb.d
+        #- name: mysql-config-volume  # New volume for configuration
+        #  mountPath: /etc/mysql/my.cnf  # MySQL configuration path
+        #  subPath: my.cnf  # This ensures we only overwrite the specific file
+      volumes:
+      - name: mysql-persistent-storage
+        persistentVolumeClaim:
+          claimName: mysql-pvc-jenkins
+      - name: mysql-initdb
+        emptyDir: {}
+      - name: mysql-config-volume  # Define the volume for the ConfigMap
+        configMap:
+          name: mysql-config  # Reference the ConfigMap we created earlier
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc-jenkins
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-jenkins
+  labels:
+    app: mysql-jenkins
+spec:
+  ports:
+    - port: 3306
+  selector:
+    app: mysql-jekins
+  type: ClusterIP

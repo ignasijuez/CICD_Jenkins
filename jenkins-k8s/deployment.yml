@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jenkins-petclinic-deployment
+  labels:
+    app: petclinic-jenkins
+spec:
+  replicas: 1  # Number of application instances (pods)
+  selector:
+    matchLabels:
+      app: petclinic-jenkins
+  template:
+    metadata:
+      labels:
+        app: petclinic-jenkins
+      annotations:
+        pod-name: jenkins-petclinic-deployment
+    spec:
+      containers:
+      - name: petclinic-app
+        image: juezignasi/ga-app:latest  # Replace with your DockerHub image URL
+        ports:
+        - containerPort: 8080
+        env:
+        - name: MYSQL_URL
+          value: "jdbc:mysql://mysql-jenkins:3306/petclinic"
+        - name: SPRING_DATASOURCE_USERNAME
+          value: "petclinic"
+        - name: SPRING_DATASOURCE_PASSWORD
+          value: "petclinic"
+        - name: SPRING_JPA_DATABASE_PLATFORM
+          value: "org.hibernate.dialect.MySQLDialect"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: petclinic-jenkins
+  labels:
+    app: petclinic-jenkins
+spec:
+  selector:
+    app: petclinic-jenkins
+  ports:
+    - protocol: TCP
+      port: 8095   # Exposed port
+      targetPort: 8080   # Container's port
+      nodePort: 30009
+  type: NodePort
+  
