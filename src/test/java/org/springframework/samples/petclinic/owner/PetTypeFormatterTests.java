@@ -41,7 +41,7 @@ import org.springframework.test.context.ActiveProfiles;
  */
 @ExtendWith(MockitoExtension.class)
 @DisabledInNativeImage
-@ActiveProfiles("h2")
+//@ActiveProfiles("h2")
 class PetTypeFormatterTests {
 
 	@Mock

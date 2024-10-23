@@ -41,7 +41,7 @@ import org.springframework.test.context.ActiveProfiles;
 @WebMvcTest(VisitController.class)
 @DisabledInNativeImage
 @DisabledInAotMode
-@ActiveProfiles("h2")
+//@ActiveProfiles("h2")
 class VisitControllerTests {
 
 	private static final int TEST_OWNER_ID = 1;

@@ -72,7 +72,7 @@ import org.springframework.test.context.ActiveProfiles;
 // Ensure that if the mysql profile is active we connect to the real database:
 @AutoConfigureTestDatabase(replace = Replace.NONE)
 // @TestPropertySource("/application-postgres.properties")
-@ActiveProfiles("h2")
+//@ActiveProfiles("h2")
 class ClinicServiceTests {
 
 	@Autowired

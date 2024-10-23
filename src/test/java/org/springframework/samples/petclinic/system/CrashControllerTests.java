@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
  */
 // Waiting https://github.com/spring-projects/spring-boot/issues/5574 ..good
 // luck ((plain(st) UNIT test)! :)
-@ActiveProfiles("h2")
+//@ActiveProfiles("h2")
 class CrashControllerTests {
 
 	CrashController testee = new CrashController();
