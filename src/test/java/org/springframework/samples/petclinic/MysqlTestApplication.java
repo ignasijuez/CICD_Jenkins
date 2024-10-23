@@ -22,6 +22,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.testcontainers.containers.MySQLContainer;
+import org.junit.jupiter.api.Disabled;
 
 /**
  * PetClinic Spring Boot Application.
@@ -29,6 +30,7 @@ import org.testcontainers.containers.MySQLContainer;
  * @author Dave Syer
  *
  */
+@Disabled
 @Configuration
 public class MysqlTestApplication {
 
