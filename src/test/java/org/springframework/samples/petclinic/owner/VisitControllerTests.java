@@ -40,6 +40,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @WebMvcTest(VisitController.class)
 @DisabledInNativeImage
 @DisabledInAotMode
+@ActiveProfiles("h2")
 class VisitControllerTests {
 
 	private static final int TEST_OWNER_ID = 1;

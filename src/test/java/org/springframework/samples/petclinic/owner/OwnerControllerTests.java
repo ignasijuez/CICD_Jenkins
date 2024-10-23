@@ -57,6 +57,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(OwnerController.class)
 @DisabledInNativeImage
 @DisabledInAotMode
+@ActiveProfiles("h2")
 class OwnerControllerTests {
 
 	private static final int TEST_OWNER_ID = 1;
