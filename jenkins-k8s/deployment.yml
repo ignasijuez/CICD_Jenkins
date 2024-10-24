@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: jenkins-petclinic-deployment
   labels:
-    app: jenkins-petclinic-pod
+    app: jenkins-petclinic-deployment
 spec:
   replicas: 1  # Number of application instances (pods)
   selector:
@@ -36,7 +36,7 @@ kind: Service
 metadata:
   name: jenkins-petclinic-service
   labels:
-    app: jenkins-petclinic-pod
+    app: jenkins-petclinic-service
 spec:
   selector:
     app: jenkins-petclinic-pod

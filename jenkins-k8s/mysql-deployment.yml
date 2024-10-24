@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: jenkins-mysql-deployment
   labels:
-    app: jenkins-petclinic-pod
+    app: jenkins-petclinic-deployment
 spec:
   replicas: 1
   selector:
@@ -14,10 +14,10 @@ spec:
       labels:
         app: jenkins-petclinic-pod
       annotations:
-        pod-name: jenkins-mysql-deployment
+        pod-name: jenkins-mysql-pod
     spec:
       containers:
-      - name: mysql-jenkins
+      - name: jenkins-mysql-pod
         image: mysql:8.4  # The MySQL version
         ports:
         - containerPort: 3306
@@ -63,7 +63,7 @@ kind: Service
 metadata:
   name: jenkins-mysql-service
   labels:
-    app: jenkins-mysql-pod
+    app: jenkins-mysql-service
 spec:
   ports:
     - port: 3306
