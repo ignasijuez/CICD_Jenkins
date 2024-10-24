@@ -3,16 +3,16 @@ kind: Deployment
 metadata:
   name: jenkins-mysql-deployment
   labels:
-    app: mysql-jenkins
+    app: jenkins-petclinic-pod
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: mysql-jenkins
+      app: jenkins-petclinic-pod
   template:
     metadata:
       labels:
-        app: mysql-jenkins
+        app: jenkins-petclinic-pod
       annotations:
         pod-name: jenkins-mysql-deployment
     spec:
@@ -61,12 +61,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: mysql-jenkins
+  name: jenkins-mysql-service
   labels:
-    app: mysql-jenkins
+    app: jenkins-mysql-pod
 spec:
   ports:
     - port: 3306
   selector:
-    app: mysql-jenkins
+    app: jenkins-mysql-pod
   type: ClusterIP

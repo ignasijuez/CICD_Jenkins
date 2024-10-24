@@ -3,16 +3,16 @@ kind: Deployment
 metadata:
   name: jenkins-petclinic-deployment
   labels:
-    app: petclinic-jenkins
+    app: jenkins-petclinic-pod
 spec:
   replicas: 1  # Number of application instances (pods)
   selector:
     matchLabels:
-      app: petclinic-jenkins
+      app: jenkins-petclinic-pod
   template:
     metadata:
       labels:
-        app: petclinic-jenkins
+        app: jenkins-petclinic-pod
       annotations:
         pod-name: jenkins-petclinic-deployment
     spec:
@@ -23,7 +23,7 @@ spec:
         - containerPort: 8080
         env:
         - name: MYSQL_URL
-          value: "jdbc:mysql://mysql-jenkins:3306/petclinic"
+          value: "jdbc:mysql://jenkins-mysql-service:3306/petclinic"
         - name: SPRING_DATASOURCE_USERNAME
           value: "petclinic"
         - name: SPRING_DATASOURCE_PASSWORD
@@ -34,12 +34,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: petclinic-jenkins
+  name: jenkins-petclinic-service
   labels:
-    app: petclinic-jenkins
+    app: jenkins-petclinic-pod
 spec:
   selector:
-    app: petclinic-jenkins
+    app: jenkins-petclinic-pod
   ports:
     - protocol: TCP
       port: 8095   # Exposed port
