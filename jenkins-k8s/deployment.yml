@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
       - name: petclinic-app
-        image: juezignasi/ga-app:latest  # Replace with your DockerHub image URL
+        image: juezignasi/jenkins-app:latest  # Replace with your DockerHub image URL
         ports:
         - containerPort: 8080
         env:
