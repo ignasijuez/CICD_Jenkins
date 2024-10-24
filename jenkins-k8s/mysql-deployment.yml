@@ -68,5 +68,5 @@ spec:
   ports:
     - port: 3306
   selector:
-    app: mysql-jekins
+    app: mysql-jenkins
   type: ClusterIP
