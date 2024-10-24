@@ -3,16 +3,16 @@ kind: Deployment
 metadata:
   name: jenkins-mysql-deployment
   labels:
-    app: jenkins-petclinic-deployment
+    app: jenkins-mysql-deployment
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: jenkins-petclinic-pod
+      app: jenkins-mysql-pod
   template:
     metadata:
       labels:
-        app: jenkins-petclinic-pod
+        app: jenkins-mysql-pod
       annotations:
         pod-name: jenkins-mysql-pod
     spec:
