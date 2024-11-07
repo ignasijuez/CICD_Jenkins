@@ -30,6 +30,13 @@ spec:
           value: "petclinic"
         - name: SPRING_JPA_DATABASE_PLATFORM
           value: "org.hibernate.dialect.MySQLDialect"
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "512Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
 ---
 apiVersion: v1
 kind: Service

@@ -40,6 +40,13 @@ spec:
         #- name: mysql-config-volume  # New volume for configuration
         #  mountPath: /etc/mysql/my.cnf  # MySQL configuration path
         #  subPath: my.cnf  # This ensures we only overwrite the specific file
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "512Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
       volumes:
       - name: mysql-persistent-storage
         persistentVolumeClaim:
