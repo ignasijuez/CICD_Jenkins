@@ -4,28 +4,13 @@
     xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
 
-    <!-- Nuevo cambio para agregar un vet -->
-    <!-- <changeSet id="add-new-vet-liquibase-test" author="your_name">
-        <insert tableName="vets">
-            <column name="id" valueComputed="(SELECT COALESCE(MAX(id), 0) + 1 FROM vets)"/>
-            <column name="first_name" value="Liquibase"/>
-            <column name="last_name" value="Test 1"/>
-        </insert>
-    </changeSet> -->
-
-    <changeSet id="add-new-vet-liquibase-test" author="your_name">
-        <preConditions onFail="MARK_RAN">
-            <sqlCheck expectedResult="0">
-                SELECT COUNT(*) FROM vets WHERE first_name='Liquibase' AND last_name='Test 2';
-            </sqlCheck>
-        </preConditions>
+    <!-- Changeset de prueba para insertar un nuevo vet -->
+    <changeSet id="test-add-new-vet" author="your_name" runOnChange="true">
         <sql>
             SET @next_id = (SELECT COALESCE(MAX(id), 0) + 1 FROM vets);
-            INSERT INTO vets (id, first_name, last_name) VALUES (@next_id, 'Liquibase', 'Test 2');
+            INSERT INTO vets (id, first_name, last_name) 
+            VALUES (@next_id, 'Liquibase', 'Test Change');
         </sql>
     </changeSet>
 
 </databaseChangeLog>
-
-
-
