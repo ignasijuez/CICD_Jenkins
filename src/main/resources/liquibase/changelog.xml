@@ -1,0 +1,16 @@
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <!-- Nuevo cambio para agregar un vet -->
+    <changeSet id="add-new-vet-liquibase-test" author="your_name">
+        <insert tableName="vets">
+            <column name="id" valueComputed="(SELECT COALESCE(MAX(id), 0) + 1 FROM vets)"/>
+            <column name="first_name" value="Liquibase"/>
+            <column name="last_name" value="Test 1"/>
+        </insert>
+    </changeSet>
+
+</databaseChangeLog>
