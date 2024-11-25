@@ -16,7 +16,7 @@
     <changeSet id="add-new-vet-liquibase-test" author="your_name">
         <preConditions onFail="MARK_RAN">
             <sqlCheck expectedResult="0">
-                SELECT COUNT(*) FROM vets WHERE first_name='Liquibase' AND last_name='Test 1';
+                SELECT COUNT(*) FROM vets WHERE first_name='Liquibase' AND last_name='Test 2';
             </sqlCheck>
         </preConditions>
         <sql>
