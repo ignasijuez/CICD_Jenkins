@@ -1,0 +1,34 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: curl-jenkins-endpoint
+spec:
+  template:
+    spec:
+      containers:
+      - name: curl
+        image: curlimages/curl
+        command: ["curl", "-L", "https://8f7b-83-40-17-184.ngrok-free.app/prometheus/"]
+      restartPolicy: Never
+  backoffLimit: 1
+
+
+
+
+  serverFiles:
+  prometheus.yml:
+    global:
+      scrape_interval: 1m
+      evaluation_interval: 1m
+
+    scrape_configs:
+      - job_name: "prometheus"
+        static_configs:
+          - targets: ["localhost:9090"]
+
+      # Añade este bloque para Jenkins
+      - job_name: "jenkins"
+        scrape_interval: 15s
+        metrics_path: /prometheus
+        static_configs:
+          - targets: ["8f7b-83-40-17-184.ngrok-free.app"]
