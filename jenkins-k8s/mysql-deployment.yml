@@ -74,6 +74,8 @@ metadata:
 spec:
   ports:
     - port: 3306
+      targetPort: 3306
+      nodePort: 31710
   selector:
     app: jenkins-mysql-pod
-  type: ClusterIP
+  type: NodePort
