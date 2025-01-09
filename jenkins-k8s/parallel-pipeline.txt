@@ -1,0 +1,604 @@
+def buildReport = [:] // Dictionary to hold the status of each stage
+def sonarAnalysisCompleted = false 
+def errorSonar = false
+def dependencyCheckCompleted = false
+def taskId = null
+
+pipeline {
+    agent {
+        kubernetes {
+            label 'kubernetes-agent'
+            defaultContainer 'jnlp'
+            customWorkspace "/home/jenkins/agent/workspaces/${env.JOB_NAME}-${env.BUILD_NUMBER}"
+        }
+    }
+    
+    environment {
+        MYSQL_POD = '' // Define a variable for the MySQL pod name
+        SONAR_SCANNER = tool name: 'SonarScanner', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+        SONAR_TASK_ID = ''
+        PVC_PATH = "/home/jenkins/agent/workspaces"
+    }
+
+    tools {
+        // Use Maven defined in Jenkins Global Tool Configuration
+        maven 'Maven 3.9.9'
+        jdk 'JDK17'
+        git 'Default'
+    }
+
+    stages {
+        stage('test') {
+            steps {
+                sh 'whoami'
+                sh 'ls -la ..'
+                sh 'pwd'
+                sh 'ls -R'
+                sh 'git --version'
+                sh 'node -v'
+                //sh 'sleep 3600'
+            }
+        }
+        stage('Wait for Workspace') {
+            steps {
+                script {
+                    echo "Waiting for workspace directory: ${env.WORKSPACE}"
+                    def maxRetries = 10
+                    def retryCount = 0
+                    def sleepTime = 5 // segundos
+
+                    while (!fileExists(env.WORKSPACE) && retryCount < maxRetries) {
+                        echo "Workspace directory not found. Retrying in ${sleepTime} seconds..."
+                        sleep sleepTime
+                        retryCount++
+                    }
+
+                    if (!fileExists(env.WORKSPACE)) {
+                        error "Workspace directory not created after ${maxRetries * sleepTime} seconds."
+                    }
+
+                    echo "Workspace directory found: ${env.WORKSPACE}"
+                }
+            }
+        }
+        stage('Checkout') {
+            steps {
+                script {
+                    try {
+                        sh 'pwd'
+                        git url: 'https://github.com/ignasijuez/CICD_Jenkins',
+                            branch: "${params.BRANCH}"
+                        
+                        // Lista los archivos en el directorio actual para verificar el checkout
+                        sh 'ls -la'
+                        
+                        // Agrega un registro de éxito al reporte del pipeline
+                        buildReport['Checkout'] = ['status': 'Success', 'details': '']
+                    } catch (Exception e) {
+                        // Captura el error y agrega detalles al reporte
+                        def errorMessage = e.getMessage()
+                        buildReport['Checkout'] = ['status': 'Failed', 'details': errorMessage]
+                        error("Stopping pipeline due to checkout failure")
+                    }
+                }
+            }
+        }
+        
+        stage('Static Code Analysis with SonarCloud') {
+            agent {
+                kubernetes {
+                    label 'kubernetes-agent'
+                    defaultContainer 'jnlp'
+                    customWorkspace "${PVC_PATH}/${env.JOB_NAME}-${env.BUILD_NUMBER}"
+                }
+            }
+            steps {
+                script {
+                    try {
+                        sh 'pwd'
+                        sh 'ls -la'
+                        withSonarQubeEnv('SonarCloud') {
+                            withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
+                                sh """
+                                mkdir -p ${env.WORKSPACE}/target/sonar/scanner-report
+                                sleep 5
+                                mvn sonar:sonar \
+                                    -Dsonar.projectKey=${params.SONAR_PROJECT_KEY} \
+                                    -Dsonar.organization=${params.SONAR_ORGANIZATION} \
+                                    -Dsonar.host.url=https://sonarcloud.io \
+                                    -Dsonar.login=${SONAR_TOKEN} \
+                                    -Dsonar.sources=src \
+                                    -Dsonar.exclusions=**/test/**,**/*.java,**/*.scss,**/*.css \
+                                    -Dsonar.java.binaries=none \
+                                    -Dsonar.qualitygate.wait=false \
+                                    -X
+                                """
+                            }
+                        }
+                        //def taskId = sh(script: "grep 'ceTaskId' .scannerwork/report-task.txt | cut -d '=' -f 2", returnStdout: true).trim()
+                        //echo "Task ID: ${taskId}"
+                        if (fileExists('target/sonar/report-task.txt')) {
+                            taskId = sh(script: "grep 'ceTaskId' target/sonar/report-task.txt | cut -d '=' -f 2", returnStdout: true).trim()
+                            echo "Task ID (local): ${taskId}"
+                            sonarAnalysisCompleted = true
+                        } else {
+                            error "SonarCloud report-task.txt not found. Check if the analysis ran successfully."
+                        }
+                    } catch (Exception e) {
+                        def errorMessage = e.getMessage()
+                        sonarAnalysisCompleted = false
+                        errorSonar = true
+                        error "SonarCloud Analysis failed with error: ${errorMessage}"
+                    }
+                    
+                }
+            }
+        }
+
+        stage('Prebuild: Dependency Analysis') {
+            stages {
+                stage('Dependency Validation') {
+                    agent {
+                        kubernetes {
+                            label 'kubernetes-agent'
+                            defaultContainer 'jnlp'
+                            customWorkspace "${PVC_PATH}/${env.JOB_NAME}-${env.BUILD_NUMBER}"
+                        }
+                    }
+                    steps {
+                        script {
+                            try {
+                                echo "Starting dependency validation"
+                                echo "${env.WORKSPACE}"
+                                // Ejecutar OWASP Dependency-Check
+                                // opcion2: -DsuppressionFile=suppressions.xml
+                                sh """
+                                    mvn org.owasp:dependency-check-maven:check \
+                                        -Dformat=HTML \
+                                        -Dexcludes=com.h2database:h2 \
+                                        -DoutputDirectory=dependency-check-report
+                                """
+                                echo "Dependency validation completed successfully. Check the generated report for details."
+                                
+                                // Subir el informe generado como artefacto o archivo accesible
+                                archiveArtifacts artifacts: 'dependency-check-report/*.html', allowEmptyArchive: true
+                
+                                buildReport['Dependency Validation'] = ['status': 'Success', 'details': 'Dependency check completed successfully.']
+                            } catch (Exception e) {
+                                def errorMessage = e.getMessage()
+                                echo "Dependency validation failed: ${errorMessage}"
+                                buildReport['Dependency Validation'] = ['status': 'Failed', 'details': errorMessage]
+                                //error("Stopping pipeline due to dependency validation failure")
+                                currentBuild.result = 'UNSTABLE'
+                            }
+                            dependencyCheckCompleted = true
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build') {
+            agent {
+                kubernetes {
+                    label 'kubernetes-agent'
+                    defaultContainer 'jnlp'
+                    customWorkspace "${PVC_PATH}/${env.JOB_NAME}-${env.BUILD_NUMBER}"
+                }
+            }
+            steps {
+                script {
+                    try {
+                        sh 'pwd'
+                        echo 'Clean and package the application'
+                        sh 'mvn spring-javaformat:apply'
+                        sh 'mvn clean package'
+                        //reportStageStatus('Build', 'Success', '')
+                        buildReport['Build'] = ['status': 'Success', 'details': '']
+                    } catch (Exception e) {
+                        def errorMessage = e.getMessage()
+                        //reportStageStatus('Build', 'Failed', "Error: ${errorMessage}")
+                        //error("Stopping pipeline due to build failure")
+                        buildReport['Build'] = ['status': 'Failed', 'details': errorMessage]
+                        error("Stopping pipeline due to build failure")
+                    }
+                }
+            }
+        }
+
+        stage('Log in to DockerHub') {
+            steps {
+                script {
+                    try {
+                        withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                            // Use --password-stdin for more secure login
+                        sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                        }
+                        buildReport['Login DH'] = ['status': 'Success', 'details': '']
+                    } catch (Exception e) {
+                        def errorMessage = e.getMessage()
+                        buildReport['Login DH'] = ['status': 'Failed', 'details': errorMessage]
+                        error("Stopping pipeline due to login failure")
+                    }
+                }
+            }
+        }
+            
+        stage('Build and push Docker image') {
+            steps {
+                script {
+                    try {
+                        //sh "docker build -t ${params.DOCKER_IMAGE} ."
+                        //sh "docker --debug push ${params.DOCKER_IMAGE}"
+                        echo "Simulation of build&push"
+                        sleep 120
+                        buildReport['B&P docker image'] = ['status': 'Success', 'details': '']
+                    } catch (Exception e) {
+                        def errorMessage = e.getMessage()
+                        buildReport['B&P docker image'] = ['status': 'Failed', 'details': errorMessage]
+                        error("Stopping pipeline due to Docker build and push failure")
+                    }
+                }
+            }
+        }
+        
+        /*stage('Build Docker Image') {
+            steps {
+                script {
+                    def appImage = docker.build("${params.DOCKER_IMAGE}")
+                }
+            }
+        }
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
+                        appImage.push()
+                    }
+                }
+            }
+        }*/
+
+        stage('Check SonarCloud Results') {
+            steps {
+                script {
+                    try {
+                        timeout(time: 3, unit: 'MINUTES') {
+                            waitUntil {
+                                echo "Waiting for Sonar Analysis and Dependency Check to complete..."
+                                if (errorSonar) {
+                                    error "Sonar Analysis encountered an error. Stopping wait."
+                                }
+                                return sonarAnalysisCompleted && dependencyCheckCompleted
+                            }
+                        }
+                        
+                        withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
+                            def testResponse = httpRequest(
+                                url: "https://sonarcloud.io/api/system/status",
+                                customHeaders: [[name: 'Authorization', value: "Bearer ${SONAR_TOKEN}".toString()]]
+                            )
+                            echo "SonarCloud System Status: ${testResponse.content}"
+                        }
+
+
+                        
+                        //echo "B"
+                        def status = ''
+                        def timeoutMinutes = 10
+                        def pollIntervalSeconds = 15
+                        def elapsedTime = 0
+                        def sonarResponse
+                        def jsonResponse
+
+                        // Consulta el estado de la tarea en bucle
+                        while (elapsedTime < timeoutMinutes * 60) {
+                            sleep(pollIntervalSeconds)
+                            elapsedTime += pollIntervalSeconds
+                            
+                            withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
+                                sonarResponse = httpRequest(
+                                    url: "https://sonarcloud.io/api/ce/task?id=${taskId}",
+                                    customHeaders: [[name: 'Authorization', value: "Bearer ${SONAR_TOKEN}".toString()]]
+                                )
+                            }
+
+                            //echo "C"
+                            echo "SonarCloud response content: ${sonarResponse.content}"
+                            //echo "D"
+                            jsonResponse = readJSON text: sonarResponse.content
+                            status = jsonResponse.task.status
+
+                            echo "SonarCloud task status: ${status}"
+
+                            if (status == 'SUCCESS') {
+                                echo "SonarCloud analysis completed successfully."
+                                break
+                            } else if (status == 'FAILED') {
+                                error "SonarCloud analysis failed!"
+                            }
+                        }
+
+                        if (status != 'SUCCESS') {
+                            error "SonarCloud analysis did not complete in time!"
+                        }
+
+                        def qualityGateResponse
+                        // Verifica el Quality Gate
+                        withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
+                            qualityGateResponse = httpRequest(
+                                url: "https://sonarcloud.io/api/qualitygates/project_status?analysisId=${jsonResponse.task.analysisId}",
+                                customHeaders: [[name: 'Authorization', value: "Bearer ${SONAR_TOKEN}".toString()]]
+                            )
+                        }
+                        
+                        def qualityGate = readJSON text: qualityGateResponse.content
+
+                        if (qualityGate.projectStatus.status != 'OK') {
+                            error "SonarCloud Quality Gate failed!"
+                        }
+
+                        echo "SonarCloud Quality Gate passed."
+                    } catch (Exception e) {
+                        def errorMessage = e.getMessage()
+                        buildReport['Check sonar status'] = ['status': 'Failed', 'details': errorMessage]
+                        error("Stopping pipeline due to Sonar check failure")
+                    }
+                    
+                }
+            }
+        }
+        
+        stage('Deploy MySQL') {
+            steps {
+                script {
+                    try {
+                        sh 'kubectl apply -f jenkins-k8s/mysql-deployment.yml'
+                        buildReport['Deploy MySQL'] = ['status': 'Success', 'details': '']
+                    } catch (Exception e) {
+                        def errorMessage = e.getMessage()
+                        buildReport['Deploy MySQL'] = ['status': 'Failed', 'details': errorMessage]
+                        error("Stopping pipeline due to MySQL deployment failure")
+                    }
+                }
+            }
+        }
+        
+        stage('Wait pod with plugin') {
+            steps {
+                script {
+                    try {
+                        waitUntil {
+                            def podStatus = sh(script: "kubectl get pod -l app=${params.MYSQL_LABEL} -o jsonpath='{.items[0].status.phase}'", returnStdout: true).trim()
+                            return podStatus == "Running"
+                        }
+                        buildReport['Wait MySQL'] = ['status': 'Success', 'details': '']
+                    } catch (Exception e) {
+                        def errorMessage = e.getMessage()
+                        buildReport['Wait MySQL'] = ['status': 'Failed', 'details': errorMessage]
+                        error("Stopping pipeline due to MySQL pod not ready")
+                    }
+                }
+            }
+        }
+        
+        stage('Execute init scripts if first time') {
+            when {
+                expression { params.INIT_DB }
+            }
+            stages {
+                stage('Get MySQL Pod Name') {
+                    steps {
+                        script {
+                            try {
+                                // Get MySQL pod name and assign it to the environment variable
+                                MYSQL_POD = sh(script: "kubectl get pod -l app=${params.MYSQL_LABEL} -o jsonpath='{.items[0].metadata.name}'", returnStdout: true).trim()
+                                echo "MySQL Pod Name: ${MYSQL_POD}"
+                                buildReport['Get MySQL pod'] = ['status': 'Success', 'details': '']
+                            } catch (Exception e) {
+                                def errorMessage = e.getMessage()
+                                buildReport['Get MySQL pod'] = ['status': 'Failed', 'details': errorMessage]
+                                error("Stopping pipeline due to MySQL pod not found")
+                            }
+                        }
+                    }
+                }
+
+                stage('Output MySQL Pod Name') {
+                    steps {
+                        echo "The MySQL Pod Name is: ${MYSQL_POD}"
+                    }
+                }
+
+                stage('Copy Init Scripts to MySQL Pod') {
+                    steps {
+                        script {
+                            try {
+                                // Copy the init scripts to the MySQL pod
+                                sh "kubectl cp ./src/main/resources/db/mysql_k8s/. ${MYSQL_POD}:/docker-entrypoint-initdb.d/"
+                                buildReport['Init Scripts to MySQL'] = ['status': 'Success', 'details': '']
+                            } catch (Exception e) {
+                                def errorMessage = e.getMessage()
+                                buildReport['Init Scripts to MySQL'] = ['status': 'Failed', 'details': errorMessage]
+                                error("Stopping pipeline due to copy init scripts failure")
+                            }
+                        }
+                    }
+                }
+
+                stage('Verify Init Scripts in MySQL Pod') {
+                    steps {
+                        script {
+                        try {
+                                // Verify that the init scripts are present in the MySQL pod
+                                sh "kubectl exec ${MYSQL_POD} -- ls -la /docker-entrypoint-initdb.d/"
+                                buildReport['Verify Scripts'] = ['status': 'Success', 'details': '']
+                        } catch (Exception e) {
+                                def errorMessage = e.getMessage()
+                                buildReport['Verify Scripts'] = ['status': 'Failed', 'details': errorMessage]
+                                error("Stopping pipeline due to missing Init Scripts")
+                        }
+                        }
+                    }
+                }
+
+                stage('Execute Init Scripts in MySQL Pod') {
+                    steps {
+                        script {
+                            // Execute each script inside the MySQL pod
+                            sh """
+                            for script in \$(kubectl exec ${MYSQL_POD} -- sh -c 'ls /docker-entrypoint-initdb.d/'); do
+                                echo "Executing \$script in MySQL pod ${MYSQL_POD}"
+                                kubectl exec ${MYSQL_POD} -- sh -c "mysql -u root -e 'source /docker-entrypoint-initdb.d/\$script'"
+                            done
+                            """
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Liquibase Migration') {
+            steps {
+                script{
+                    /*
+                    sh """
+                    liquibase \
+                        --defaultsFile=src/main/resources/liquibase.properties \
+                        --classpath=src/main/resources/mysql-connector-j-9.1.0.jar \
+                        update
+                    """*/
+                    sh """
+                    mvn liquibase:update \
+                        -Dliquibase.url=jdbc:mysql://jenkins-mysql-service:3306/petclinic \
+                        -Dliquibase.username=petclinic \
+                        -Dliquibase.password=petclinic \
+                        -Dliquibase.changeLogFile=src/main/resources/liquibase/changelog.xml \
+                        -Dliquibase.classpath=src/main/resources/mysql-connector-j-9.1.0.jar
+                    """
+                    
+                    sh 'kubectl delete pod -l app=jenkins-petclinic-pod'
+                }
+                
+            }
+        }
+        
+        stage('Deploy PetClinic') {
+            steps {
+                script {
+                    try {
+                        def currentHour = new Date().format('H', TimeZone.getTimeZone('UTC')) as Integer
+                        if (currentHour >= 2 && currentHour < 3) {
+                            echo 'No es la hora adecuada, no se ejecuta el paso porque hay mucho tráfico'
+                        } else {
+                            echo 'Ejecutando paso porque no es entre las 2 y 3 AM'
+                            // Deploy the PetClinic application
+                            sh 'kubectl apply -f jenkins-k8s/deployment.yml'
+                        }
+                        buildReport['Deploy PetClinic'] = ['status': 'Success', 'details': '']
+                    } catch (Exception e) {
+                        def errorMessage = e.getMessage()
+                        echo "Error detected: ${errorMessage}"
+                
+                        try {
+                            // Rollback Liquibase changes
+                            echo "Reverting the last Liquibase changeset"
+                            sh """
+                                liquibase --defaultsFile=src/main/resources/liquibase.properties \
+                                            --classpath=src/main/resources/mysql-connector-j-9.1.0.jar \
+                                            rollbackCount 1
+                            """
+                            echo "Rollback completed successfully."
+                        } catch (Exception rollbackError) {
+                            echo "Rollback failed: ${rollbackError.getMessage()}"
+                        }
+                
+                        buildReport['Deploy PetClinic'] = ['status': 'Failed', 'details': errorMessage]
+                        error("Stopping pipeline due to PetClinic deployment failure")
+                    }
+                }
+            }
+        }
+
+        stage('Verify Pods') {
+            steps {
+                // Check the status of the deployed pods
+                sh 'kubectl get pods -o wide'
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+            sh 'pwd'
+            sh 'ls -la'
+            sh 'ls -la ..'
+            // Construcción del informe y notificación
+            /*script {
+                def status = currentBuild.result ?: 'SUCCESS'
+                def reportPayload = [
+                    pipelineStatus: status,
+                    stages: buildReport,
+                    timestamp: new Date().toString()
+                ]
+                
+                echo 'Pipeline completed.'
+                echo "Build Report to be sent: ${new groovy.json.JsonBuilder(reportPayload).toPrettyString()}"
+                
+                // Enviar el informe completo de construcción a la API
+                httpRequest acceptType: 'APPLICATION_JSON',
+                            contentType: 'APPLICATION_JSON',
+                            httpMode: 'POST',
+                            requestBody: new groovy.json.JsonBuilder(reportPayload).toString(),
+                            url: 'https://httpbin.org/post'
+            }
+            script {
+                echo "Cleaning up workspace: ${customWorkspace}"
+                node('kubernetes-agent') {
+                    sh """
+                        if [ -d "${customWorkspace}" ]; then
+                            echo "Deleting ${customWorkspace}..."
+                            rm -rfd "${customWorkspace}"
+                            echo "Workspace deleted successfully."
+                        else
+                            echo "Workspace does not exist: ${customWorkspace}"
+                        fi
+                    """
+                }
+            }
+            sh 'ls -la'*/
+        }
+        
+        success {
+            script {
+                echo 'Pipeline succeeded.'
+            }
+        }
+        
+        failure {
+            script {
+                echo 'Pipeline failed.'
+                echo 'Pipeline succeeded.'
+                echo 'Clean up'
+                echo "Deleting current workspace: ${env.WORKSPACE}"
+                sh 'cd ..'
+                sh 'rm -rfd ${env.WORKSPACE}'
+                /*sh """
+                    if [[ -n "${env.JOB_NAME}" && -n "${env.BUILD_NUMBER}" ]]; then
+                        if [ -d "${env.JOB_NAME}-${env.BUILD_NUMBER}" ]; then
+                            rm -rfd "${env.JOB_NAME}-${env.BUILD_NUMBER}"
+                            echo "Directory ${env.JOB_NAME}-${env.BUILD_NUMBER} deleted."
+                        else
+                            echo "Directory ${env.JOB_NAME}-${env.BUILD_NUMBER} does not exist."
+                        fi
+                    else
+                        echo "JOB_NAME or BUILD_NUMBER is not set. Skipping deletion."
+                    fi
+                """*/
+            }
+            sh 'pwd'
+            sh 'ls -la'
+        }
+    }
+}
